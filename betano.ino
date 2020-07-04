@@ -276,7 +276,7 @@ String checksum(String s)   // Checksum calculation
 void setup() {
   // Start serual and bluetooth
   Serial.begin(115200);
-  ESP_BT.begin("SV-650_BTelemetry-dev");
+  ESP_BT.begin("SV-650_BTelemetry");
   Wire.begin();
   Wire.setClock(100000); //Increase I2C clock speed to 400kHz
 
