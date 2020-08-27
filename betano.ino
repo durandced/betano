@@ -2,11 +2,16 @@
 #include <esp_timer.h>
 #include "BluetoothSerial.h"
 #include <Wire.h> //Needed for I2C to GPS
+#include <Adafruit_MLX90614.h>
 
 #include "SparkFun_Ublox_Arduino_Library.h" //Click here to get the library: http://librarymanager/All#SparkFun_Ublox_GPS
 
 /* Communication with the outside world */
 BluetoothSerial ESP_BT;
+Adafruit_MLX90614 mlx = Adafruit_MLX90614();
+float tyre_temp= 0;
+float ambient_temp= 0;
+int temp_error= 0;
 
 SFE_UBLOX_GPS myGPS;
 long gps_check_time = 0;
@@ -96,6 +101,48 @@ void loop(){
   if (ESP_BT.available()) //Check if we receive anything from Bluetooth
   {
     Serial1.write(ESP_BT.read());
+  }
+
+  if (current - old_time > 100000) {
+    //$RC3,[time],[count],[xacc],[yacc],[zacc],[gyrox],[gyroy],[gyroz],[rpm/d1],[d2],[a1],[a2],[a3],[a4],[a5],[a6],[a7],[a8],[a9],[a10],[a11],[a12],[a13],[a14],[a15]*[checksum]
+    float t_temp = mlx.readObjectTempC();
+    if (t_temp > 0 && t_temp < 150) {
+      ambient_temp = mlx.readAmbientTempC();
+      tyre_temp = t_temp;
+      temp_error = 0;
+    }
+    else
+    {
+      temp_error = 1;
+    }
+
+    String str = String("$RC3,,") + String(count++) + ",";
+    //str += String(tempTC,1) + ",";   //[a2],   (thermocouple)
+    str+= String(tyre_temp) + ",";
+    str+= String(ambient_temp) + ",";
+    str+= ",";
+    str+= ",";
+    str+= ",";
+    str+= ",,,"; // gyroz,d1,d2
+    str+= ","; // a1
+    str+= ","; // a2
+    str+= ","; // a3
+    str+= ","; // a4
+    str+= ","; // a5
+    str+= ","; // a6
+    str+= ","; //a7
+    str+= ","; //a8
+    str+= ","; //a9
+    str+= String(temp_error) + ","; //a10
+    str+= ","; //a11
+    str+= ","; //a12
+    str+= ","; //a13
+    str+= ","; //a14
+    str+= "*"; //a15
+    Serial.println(str + checksum(str));
+    ESP_BT.println(str + checksum(str));
+
+    old_time = current;
   }
 
   /* if (millis() - lastTime > 1000) */
