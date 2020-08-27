@@ -28,10 +28,11 @@ static void gaeta_timer_callback(void* arg)
 void setup() {
   // Start serual and bluetooth
   Serial.begin(115200);
+  Serial1.begin(38400);
   ESP_BT.begin("SV-650_GPS");
 
   Wire.begin();
-  Wire.setClock(400000); //Increase I2C clock speed to 400kHz
+  Wire.setClock(100000); //Increase I2C clock speed to 400kHz
 
 
   if (myGPS.begin(Wire, 0x42) == false) {
@@ -92,30 +93,34 @@ void loop(){
     /* ESP_BT.printf("%s", gpsdata); */
     /* gpsdata[0] = 0; */
   }
-
-  if (millis() - lastTime > 1000)
+  if (ESP_BT.available()) //Check if we receive anything from Bluetooth
   {
-    lastTime = millis(); //Update the timer
-
-    long latitude = myGPS.getLatitude();
-    Serial.print(F("Lat: "));
-    Serial.print(latitude);
-
-    long longitude = myGPS.getLongitude();
-    Serial.print(F(" Long: "));
-    Serial.print(longitude);
-    Serial.print(F(" (degrees * 10^-7)"));
-
-    long altitude = myGPS.getAltitude();
-    Serial.print(F(" Alt: "));
-    Serial.print(altitude);
-    Serial.print(F(" (mm)"));
-
-    long accuracy = myGPS.getPositionAccuracy();
-    Serial.print(F(" 3D Positional Accuracy: "));
-    Serial.print(accuracy);
-    Serial.println(F("mm"));
+    Serial1.write(ESP_BT.read());
   }
+
+  /* if (millis() - lastTime > 1000) */
+  /* { */
+  /*   lastTime = millis(); //Update the timer */
+
+  /*   long latitude = myGPS.getLatitude(); */
+  /*   Serial.print(F("Lat: ")); */
+  /*   Serial.print(latitude); */
+
+  /*   long longitude = myGPS.getLongitude(); */
+  /*   Serial.print(F(" Long: ")); */
+  /*   Serial.print(longitude); */
+  /*   Serial.print(F(" (degrees * 10^-7)")); */
+
+  /*   long altitude = myGPS.getAltitude(); */
+  /*   Serial.print(F(" Alt: ")); */
+  /*   Serial.print(altitude); */
+ /*   Serial.print(F(" (mm)")); */
+
+  /*   long accuracy = myGPS.getPositionAccuracy(); */
+  /*   Serial.print(F(" 3D Positional Accuracy: ")); */
+  /*   Serial.print(accuracy); */
+  /*   Serial.println(F("mm")); */
+  /* } */
 
 }
 
