@@ -2,21 +2,15 @@
 #include <esp_timer.h>
 #include "BluetoothSerial.h"
 #include <Wire.h> //Needed for I2C to GPS
-#include <Adafruit_MLX90614.h>
 
 #include "SparkFun_Ublox_Arduino_Library.h" //Click here to get the library: http://librarymanager/All#SparkFun_Ublox_GPS
 
 /* Communication with the outside world */
 BluetoothSerial ESP_BT;
-Adafruit_MLX90614 mlx = Adafruit_MLX90614();
-float tyre_temp= 0;
-float ambient_temp= 0;
-int temp_error= 0;
+bool bt_co = false;
 
 SFE_UBLOX_GPS myGPS;
 long gps_check_time = 0;
-char gpsdata[2048] = {0};
-long lastTime =  0;
 
 /* Led indicator */
 String outputState = "off";
@@ -29,15 +23,28 @@ static void gaeta_timer_callback(void* arg)
     ESP_LOGI(TAG, "One-shot timer called, time since boot: %lld us", time_since_boot);
 }
 
+void callback(esp_spp_cb_event_t event, esp_spp_cb_param_t *param) {
+  if (event == ESP_SPP_SRV_OPEN_EVT) {
+    Serial.println("Client connected");
+    bt_co = true;
+  }
+
+  if (event == ESP_SPP_CLOSE_EVT) {
+    Serial.println("Client disconnected");
+    bt_co = false;
+    ESP.restart(); // Dirty fix
+  }
+}
 
 void setup() {
   // Start serual and bluetooth
   Serial.begin(115200);
   Serial1.begin(38400);
+  ESP_BT.register_callback(callback);
   ESP_BT.begin("SV-650_GPS");
 
   Wire.begin();
-  Wire.setClock(100000); //Increase I2C clock speed to 400kHz
+  Wire.setClock(400000); //Increase I2C clock speed to 400kHz
 
 
   if (myGPS.begin(Wire, 0x42) == false) {
@@ -92,83 +99,17 @@ void setup() {
 
 void loop(){
   int64_t current = esp_timer_get_time();
-  if (current - gps_check_time > 250){
+  if (!bt_co) {
+    delay(1000);
+  }
+  else if (current - gps_check_time > 250){
     myGPS.checkUblox(); //See if new data is available. Process bytes as they come in.
     gps_check_time = current;
-    /* ESP_BT.printf("%s", gpsdata); */
-    /* gpsdata[0] = 0; */
-  }
-  if (ESP_BT.available()) //Check if we receive anything from Bluetooth
-  {
-    Serial1.write(ESP_BT.read());
-  }
-
-  if (current - old_time > 100000) {
-    //$RC3,[time],[count],[xacc],[yacc],[zacc],[gyrox],[gyroy],[gyroz],[rpm/d1],[d2],[a1],[a2],[a3],[a4],[a5],[a6],[a7],[a8],[a9],[a10],[a11],[a12],[a13],[a14],[a15]*[checksum]
-    float t_temp = mlx.readObjectTempC();
-    if (t_temp > 0 && t_temp < 150) {
-      ambient_temp = mlx.readAmbientTempC();
-      tyre_temp = t_temp;
-      temp_error = 0;
-    }
-    else
+    if (ESP_BT.available()) //Check if we receive anything from Bluetooth
     {
-      temp_error = 1;
+      Serial1.write(ESP_BT.read());
     }
-
-    String str = String("$RC3,,") + String(count++) + ",";
-    //str += String(tempTC,1) + ",";   //[a2],   (thermocouple)
-    str+= String(tyre_temp) + ",";
-    str+= String(ambient_temp) + ",";
-    str+= ",";
-    str+= ",";
-    str+= ",";
-    str+= ",,,"; // gyroz,d1,d2
-    str+= ","; // a1
-    str+= ","; // a2
-    str+= ","; // a3
-    str+= ","; // a4
-    str+= ","; // a5
-    str+= ","; // a6
-    str+= ","; //a7
-    str+= ","; //a8
-    str+= ","; //a9
-    str+= String(temp_error) + ","; //a10
-    str+= ","; //a11
-    str+= ","; //a12
-    str+= ","; //a13
-    str+= ","; //a14
-    str+= "*"; //a15
-    Serial.println(str + checksum(str));
-    ESP_BT.println(str + checksum(str));
-
-    old_time = current;
   }
-
-  /* if (millis() - lastTime > 1000) */
-  /* { */
-  /*   lastTime = millis(); //Update the timer */
-
-  /*   long latitude = myGPS.getLatitude(); */
-  /*   Serial.print(F("Lat: ")); */
-  /*   Serial.print(latitude); */
-
-  /*   long longitude = myGPS.getLongitude(); */
-  /*   Serial.print(F(" Long: ")); */
-  /*   Serial.print(longitude); */
-  /*   Serial.print(F(" (degrees * 10^-7)")); */
-
-  /*   long altitude = myGPS.getAltitude(); */
-  /*   Serial.print(F(" Alt: ")); */
-  /*   Serial.print(altitude); */
- /*   Serial.print(F(" (mm)")); */
-
-  /*   long accuracy = myGPS.getPositionAccuracy(); */
-  /*   Serial.print(F(" 3D Positional Accuracy: ")); */
-  /*   Serial.print(accuracy); */
-  /*   Serial.println(F("mm")); */
-  /* } */
-
 }
 
 //This function gets called from the SparkFun Ublox Arduino Library
